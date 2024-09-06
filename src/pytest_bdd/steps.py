@@ -40,7 +40,7 @@ from __future__ import annotations
 import enum
 from dataclasses import dataclass, field
 from itertools import count
-from typing import Any, Callable, Iterable, Literal, TypeVar
+from typing import Any, Callable, Iterable, TypeVar
 
 import pytest
 from _pytest.fixtures import FixtureRequest
@@ -49,7 +49,7 @@ from typing_extensions import ParamSpec
 from . import compat
 from .parser import Step
 from .parsers import StepParser, get_parser
-from .types import GIVEN, THEN, WHEN
+from .types import StepType
 from .utils import get_caller_module_locals
 
 P = ParamSpec("P")
@@ -64,7 +64,7 @@ class StepNamePrefix(enum.Enum):
 
 @dataclass
 class StepFunctionContext:
-    type: Literal["given", "when", "then"] | None
+    type: str | None
     step_func: Callable[..., Any]
     parser: StepParser
     converters: dict[str, Callable[[str], Any]] = field(default_factory=dict)
@@ -92,7 +92,7 @@ def given(
 
     :return: Decorator function for the step.
     """
-    return step(name, GIVEN, converters=converters, target_fixture=target_fixture, stacklevel=stacklevel)
+    return step(name, StepType.GIVEN.value, converters=converters, target_fixture=target_fixture, stacklevel=stacklevel)
 
 
 def when(
@@ -111,7 +111,7 @@ def when(
 
     :return: Decorator function for the step.
     """
-    return step(name, WHEN, converters=converters, target_fixture=target_fixture, stacklevel=stacklevel)
+    return step(name, StepType.WHEN.value, converters=converters, target_fixture=target_fixture, stacklevel=stacklevel)
 
 
 def then(
@@ -130,12 +130,12 @@ def then(
 
     :return: Decorator function for the step.
     """
-    return step(name, THEN, converters=converters, target_fixture=target_fixture, stacklevel=stacklevel)
+    return step(name, StepType.THEN.value, converters=converters, target_fixture=target_fixture, stacklevel=stacklevel)
 
 
 def step(
     name: str | StepParser,
-    type_: Literal["given", "when", "then"] | None = None,
+    type_: str | None = None,
     converters: dict[str, Callable[[str], Any]] | None = None,
     target_fixture: str | None = None,
     stacklevel: int = 1,
@@ -151,7 +151,7 @@ def step(
     :return: Decorator function for the step.
 
     Example:
-    >>> @step("there is an wallet", target_fixture="wallet")
+    >>> @step("there is a wallet", target_fixture="wallet")
     >>> def _() -> dict[str, int]:
     >>>     return {"eur": 0, "usd": 0}
 
