@@ -15,7 +15,7 @@ from .gherkin_parser import Scenario as GherkinScenario
 from .gherkin_parser import Step as GherkinStep
 from .gherkin_parser import Tag as GherkinTag
 from .gherkin_parser import get_gherkin_document
-from .types import GIVEN, STEP_TYPES, THEN, WHEN
+from .types import KeywordType
 
 STEP_PARAM_RE = re.compile(r"<(.+?)>")
 COMMENT_RE = re.compile(r"(^|(?<=\s))#")
@@ -166,7 +166,7 @@ class ScenarioTemplate:
         scenario_steps = [
             Step(
                 name=step.render(context),
-                type=step.type,
+                keyword_type=step.keyword_type,
                 indent=step.indent,
                 line_number=step.line_number,
                 keyword=step.keyword,
@@ -210,7 +210,7 @@ class Step:
     """Represents a step within a scenario or background.
 
     Attributes:
-        type (str): The type of step (e.g., 'given', 'when', 'then').
+        keyword_type (KeywordType): The keyword type of the step (i.e., 'Context', 'Conjunction', 'Action', 'Outcome').
         name (str): The name of the step.
         line_number (int): The line number where the step starts in the file.
         indent (int): The indentation level of the step.
@@ -220,7 +220,7 @@ class Step:
         background (Optional[Background]): The background to which this step belongs (internal use only).
     """
 
-    type: str
+    keyword_type: KeywordType
     name: str
     line_number: int
     indent: int
@@ -229,18 +229,18 @@ class Step:
     scenario: ScenarioTemplate | None = field(init=False, default=None)
     background: Background | None = field(init=False, default=None)
 
-    def __init__(self, name: str, type: str, indent: int, line_number: int, keyword: str) -> None:
+    def __init__(self, name: str, keyword_type: KeywordType, indent: int, line_number: int, keyword: str) -> None:
         """Initialize a step.
 
         Args:
             name (str): The name of the step.
-            type (str): The type of the step (e.g., 'given', 'when', 'then').
+            keyword_type (KeywordType): The keyword type of the step (i.e., 'Context', 'Conjunction', 'Action', 'Outcome').
             indent (int): The indentation level of the step.
             line_number (int): The line number where the step starts in the file.
             keyword (str): The keyword used for the step (e.g., 'Given', 'When', 'Then').
         """
         self.name = name
-        self.type = type
+        self.keyword_type = keyword_type
         self.indent = indent
         self.line_number = line_number
         self.keyword = keyword
@@ -251,7 +251,7 @@ class Step:
         Returns:
             str: A string representation of the step.
         """
-        return f'{self.type.capitalize()} "{self.name}"'
+        return f'{self.keyword.capitalize()} "{self.name}"'
 
     @property
     def params(self) -> tuple[str, ...]:
@@ -350,7 +350,9 @@ class FeatureParser:
             return []
 
         first_step = steps_data[0]
-        if first_step.keyword.lower() not in STEP_TYPES:
+        first_keyword_type = first_step.keywordType
+        if first_keyword_type == KeywordType.CONJUNCTION:
+
             raise StepError(
                 message=f"First step in a scenario or background must start with 'Given', 'When' or 'Then', but got {first_step.keyword}.",
                 line=first_step.location.line,
@@ -359,16 +361,15 @@ class FeatureParser:
             )
 
         steps = []
-        current_type = first_step.keyword.lower()
+        current_type = first_keyword_type
         for step in steps_data:
             name = get_step_content(step)
-            keyword = step.keyword.lower()
-            if keyword in STEP_TYPES:
-                current_type = keyword
+            if step.keywordType in KeywordType.all_except_conjunction():
+                current_type = step.keywordType
             steps.append(
                 Step(
                     name=name,
-                    type=current_type,
+                    keyword_type=current_type,
                     indent=step.location.column - 1,
                     line_number=step.location.line,
                     keyword=step.keyword.title(),

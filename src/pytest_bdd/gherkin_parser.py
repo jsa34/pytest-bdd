@@ -11,6 +11,7 @@ from gherkin.errors import CompositeParserException  # type: ignore
 from gherkin.parser import Parser  # type: ignore
 
 from . import exceptions
+from .types import KeywordType
 
 if typing.TYPE_CHECKING:
     from typing_extensions import Self
@@ -136,7 +137,7 @@ class DocString:
 class Step:
     id: str
     keyword: str
-    keywordType: str
+    keywordType: KeywordType
     location: Location
     text: str
     dataTable: DataTable | None = None
@@ -147,7 +148,7 @@ class Step:
         return cls(
             id=data["id"],
             keyword=data["keyword"].strip(),
-            keywordType=data["keywordType"],
+            keywordType=KeywordType.from_string(data["keywordType"]),
             location=Location.from_dict(data["location"]),
             text=data["text"],
             dataTable=DataTable.from_dict(data["dataTable"]) if data.get("dataTable") else None,
@@ -253,6 +254,7 @@ class Child:
 @dataclass
 class Feature:
     keyword: str
+    language: str
     location: Location
     tags: list[Tag]
     name: str
@@ -263,6 +265,7 @@ class Feature:
     def from_dict(cls, data: dict[str, Any]) -> Self:
         return cls(
             keyword=data["keyword"],
+            language=data["language"],
             location=Location.from_dict(data["location"]),
             tags=[Tag.from_dict(tag) for tag in data["tags"]],
             name=data["name"],
