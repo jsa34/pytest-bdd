@@ -55,7 +55,7 @@ def find_fixturedefs_for_step(step: Step, fixturemanager: FixtureManager, node: 
             if step_func_context is None:
                 continue
 
-            if step_func_context.type is not None and step_func_context.type != step.type:
+            if step_func_context.step_type is not None and step_func_context.step_type != step.step_type:
                 continue
 
             match = step_func_context.parser.is_matching(step.name)

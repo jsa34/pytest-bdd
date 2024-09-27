@@ -13,7 +13,7 @@ from .compat import getfixturedefs
 from .feature import get_features
 from .scenario import inject_fixturedefs_for_step, make_python_docstring, make_python_name, make_string_literal
 from .steps import get_step_fixture_name
-from .types import STEP_TYPES
+from .types import StepType
 
 if TYPE_CHECKING:
     from typing import Any, Sequence
@@ -151,18 +151,29 @@ def parse_feature_files(paths: list[str], **kwargs: Any) -> tuple[list[Feature],
     return features, scenarios, steps
 
 
+import itertools
+
+
 def group_steps(steps: list[Step]) -> list[Step]:
     """Group steps by type."""
-    steps = sorted(steps, key=lambda step: step.type)
+    order_mapping = {
+        StepType.GIVEN: 0,
+        StepType.WHEN: 1,
+        StepType.THEN: 2,
+    }
+
+    steps = sorted(steps, key=lambda step: order_mapping.get(step.step_type, float("inf")))
+
     seen_steps = set()
     grouped_steps = []
+
     for step in itertools.chain.from_iterable(
-        sorted(group, key=lambda step: step.name) for _, group in itertools.groupby(steps, lambda step: step.type)
+        sorted(group, key=lambda step: step.name) for _, group in itertools.groupby(steps, lambda step: step.step_type)
     ):
         if step.name not in seen_steps:
             grouped_steps.append(step)
             seen_steps.add(step.name)
-    grouped_steps.sort(key=lambda step: STEP_TYPES.index(step.type))
+
     return grouped_steps
 
 

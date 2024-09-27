@@ -15,7 +15,7 @@ from .gherkin_parser import Scenario as GherkinScenario
 from .gherkin_parser import Step as GherkinStep
 from .gherkin_parser import Tag as GherkinTag
 from .gherkin_parser import get_gherkin_document
-from .types import KeywordType
+from .types import KeywordType, StepType
 
 STEP_PARAM_RE = re.compile(r"<(.+?)>")
 COMMENT_RE = re.compile(r"(^|(?<=\s))#")
@@ -167,6 +167,7 @@ class ScenarioTemplate:
             Step(
                 name=step.render(context),
                 keyword_type=step.keyword_type,
+                step_type=step.step_type,
                 indent=step.indent,
                 line_number=step.line_number,
                 keyword=step.keyword,
@@ -210,18 +211,20 @@ class Step:
     """Represents a step within a scenario or background.
 
     Attributes:
-        keyword_type (KeywordType): The keyword type of the step (i.e., 'Context', 'Conjunction', 'Action', 'Outcome').
         name (str): The name of the step.
+        keyword_type (KeywordType): The keyword type of the step (i.e., 'Context', 'Conjunction', 'Action', 'Outcome').
+        step_type: (StepType): The type of step (e.g., 'Given', 'When', 'Then')
         line_number (int): The line number where the step starts in the file.
         indent (int): The indentation level of the step.
-        keyword (str): The keyword used for the step (e.g., 'Given', 'When', 'Then').
+        keyword (str): The keyword used for the step (e.g., 'Given', 'When', 'Then', 'And', 'But', etc.).
         failed (bool): Whether the step has failed (internal use only).
         scenario (Optional[ScenarioTemplate]): The scenario to which this step belongs (internal use only).
         background (Optional[Background]): The background to which this step belongs (internal use only).
     """
 
-    keyword_type: KeywordType
     name: str
+    keyword_type: KeywordType
+    step_type: StepType
     line_number: int
     indent: int
     keyword: str
@@ -229,18 +232,22 @@ class Step:
     scenario: ScenarioTemplate | None = field(init=False, default=None)
     background: Background | None = field(init=False, default=None)
 
-    def __init__(self, name: str, keyword_type: KeywordType, indent: int, line_number: int, keyword: str) -> None:
+    def __init__(
+        self, name: str, keyword_type: KeywordType, step_type: StepType, indent: int, line_number: int, keyword: str
+    ) -> None:
         """Initialize a step.
 
         Args:
             name (str): The name of the step.
             keyword_type (KeywordType): The keyword type of the step (i.e., 'Context', 'Conjunction', 'Action', 'Outcome').
+            step_type: (StepType): The type of step (e.g., 'Given', 'When', 'Then')
             indent (int): The indentation level of the step.
             line_number (int): The line number where the step starts in the file.
             keyword (str): The keyword used for the step (e.g., 'Given', 'When', 'Then').
         """
         self.name = name
         self.keyword_type = keyword_type
+        self.step_type = step_type
         self.indent = indent
         self.line_number = line_number
         self.keyword = keyword
@@ -342,15 +349,15 @@ class FeatureParser:
 
         def get_step_content(_gherkin_step: GherkinStep) -> str:
             step_name = strip_comments(_gherkin_step.text)
-            if _gherkin_step.docString:
-                step_name = f"{step_name}\n{_gherkin_step.docString.content}"
+            if _gherkin_step.doc_string:
+                step_name = f"{step_name}\n{_gherkin_step.doc_string.content}"
             return step_name
 
         if not steps_data:
             return []
 
         first_step = steps_data[0]
-        first_keyword_type = first_step.keywordType
+        first_keyword_type = first_step.keyword_type
         if first_keyword_type == KeywordType.CONJUNCTION:
 
             raise StepError(
@@ -361,15 +368,16 @@ class FeatureParser:
             )
 
         steps = []
-        current_type = first_keyword_type
+        current_type: StepType = StepType.from_keyword_type(first_keyword_type)
         for step in steps_data:
             name = get_step_content(step)
-            if step.keywordType in KeywordType.all_except_conjunction():
-                current_type = step.keywordType
+            if step.keyword_type in KeywordType.all_except_conjunction():
+                current_type = StepType.from_keyword_type(step.keyword_type)
             steps.append(
                 Step(
                     name=name,
-                    keyword_type=current_type,
+                    keyword_type=step.keyword_type,
+                    step_type=current_type,
                     indent=step.location.column - 1,
                     line_number=step.location.line,
                     keyword=step.keyword.title(),
@@ -404,11 +412,11 @@ class FeatureParser:
                 line_number=example_data.location.line,
                 name=example_data.name,
             )
-            if example_data.tableHeader is not None:
-                param_names = [cell.value for cell in example_data.tableHeader.cells]
+            if example_data.table_header is not None:
+                param_names = [cell.value for cell in example_data.table_header.cells]
                 examples.set_param_names(param_names)
-                if example_data.tableBody is not None:
-                    for row in example_data.tableBody:
+                if example_data.table_body is not None:
+                    for row in example_data.table_body:
                         values = [cell.value or "" for cell in row.cells]
                         examples.add_example(values)
                     scenario.examples = examples

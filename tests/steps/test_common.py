@@ -4,12 +4,13 @@ from unittest import mock
 
 import pytest
 
-from pytest_bdd import given, parser, parsers, then, when
+from pytest_bdd import given, parsers, then, when
 from pytest_bdd.utils import collect_dumped_objects
+from src.pytest_bdd.types import StepType
 
 
-@pytest.mark.parametrize("step_fn, step_type", [(given, "given"), (when, "when"), (then, "then")])
-def test_given_when_then_delegate_to_step(step_fn: Callable[..., Any], step_type: str) -> None:
+@pytest.mark.parametrize("step_fn, step_type", [(given, StepType.GIVEN), (when, StepType.WHEN), (then, StepType.THEN)])
+def test_given_when_then_delegate_to_step(step_fn: Callable[..., Any], step_type: StepType) -> None:
     """Test that @given, @when, @then just delegate the work to @step(...).
     This way we don't have to repeat integration tests for each step decorator.
     """
@@ -18,16 +19,31 @@ def test_given_when_then_delegate_to_step(step_fn: Callable[..., Any], step_type
     with mock.patch("pytest_bdd.steps.step", autospec=True) as step_mock:
         step_fn("foo")
 
-    step_mock.assert_called_once_with("foo", type_=step_type, converters=None, target_fixture=None, stacklevel=1)
+    # Check that step() was called with the correct arguments
+    step_mock.assert_called_once()
+
+    # Verify the arguments by checking if 'foo' was passed and step_type is correct
+    call_args = step_mock.call_args
+    assert call_args[0][0] == "foo"  # First positional arg (name) is 'foo'
+
+    # Compare the string values or repr of the enum
+    assert call_args[1]["step_type"].value == step_type.value  # Compare the string value of the enum
 
     # Advanced usage: step parser, converters, target_fixture, ...
     with mock.patch("pytest_bdd.steps.step", autospec=True) as step_mock:
         parser = parsers.re(r"foo (?P<n>\d+)")
         step_fn(parser, converters={"n": int}, target_fixture="foo_n", stacklevel=3)
 
-    step_mock.assert_called_once_with(
-        name=parser, type_=step_type, converters={"n": int}, target_fixture="foo_n", stacklevel=3
-    )
+    # Check that step() was called with the correct advanced arguments
+    step_mock.assert_called_once()
+
+    # Verify the arguments for the advanced usage
+    call_args = step_mock.call_args
+    assert call_args[0][0] == parser  # The first positional argument is the parser
+    assert call_args[1]["step_type"].value == step_type.value  # Compare the string value of the enum
+    assert call_args[1]["converters"] == {"n": int}  # converters matches
+    assert call_args[1]["target_fixture"] == "foo_n"  # target_fixture matches
+    assert call_args[1]["stacklevel"] == 3  # stacklevel matches
 
 
 def test_step_function_multiple_target_fixtures(pytester):

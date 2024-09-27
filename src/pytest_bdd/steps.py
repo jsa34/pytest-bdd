@@ -47,7 +47,7 @@ from typing_extensions import ParamSpec
 
 from .parser import Step
 from .parsers import StepParser, get_parser
-from .types import GIVEN, THEN, WHEN
+from .types import StepType
 from .utils import get_caller_module_locals
 
 P = ParamSpec("P")
@@ -62,7 +62,7 @@ class StepNamePrefix(enum.Enum):
 
 @dataclass
 class StepFunctionContext:
-    type: Literal["given", "when", "then"] | None
+    step_type: StepType | None
     step_func: Callable[..., Any]
     parser: StepParser
     converters: dict[str, Callable[[str], Any]] = field(default_factory=dict)
@@ -71,7 +71,7 @@ class StepFunctionContext:
 
 def get_step_fixture_name(step: Step) -> str:
     """Get step fixture name"""
-    return f"{StepNamePrefix.step_impl.value}_{step.type}_{step.name}"
+    return f"{StepNamePrefix.step_impl.value}_{step.step_type.value}_{step.name}"
 
 
 def given(
@@ -90,7 +90,9 @@ def given(
 
     :return: Decorator function for the step.
     """
-    return step(name, GIVEN, converters=converters, target_fixture=target_fixture, stacklevel=stacklevel)
+    return step(
+        name, step_type=StepType.GIVEN, converters=converters, target_fixture=target_fixture, stacklevel=stacklevel
+    )
 
 
 def when(
@@ -109,7 +111,9 @@ def when(
 
     :return: Decorator function for the step.
     """
-    return step(name, WHEN, converters=converters, target_fixture=target_fixture, stacklevel=stacklevel)
+    return step(
+        name, step_type=StepType.WHEN, converters=converters, target_fixture=target_fixture, stacklevel=stacklevel
+    )
 
 
 def then(
@@ -128,12 +132,14 @@ def then(
 
     :return: Decorator function for the step.
     """
-    return step(name, THEN, converters=converters, target_fixture=target_fixture, stacklevel=stacklevel)
+    return step(
+        name, step_type=StepType.THEN, converters=converters, target_fixture=target_fixture, stacklevel=stacklevel
+    )
 
 
 def step(
     name: str | StepParser,
-    type_: Literal["given", "when", "then"] | None = None,
+    step_type: StepType | None = None,
     converters: dict[str, Callable[[str], Any]] | None = None,
     target_fixture: str | None = None,
     stacklevel: int = 1,
@@ -141,7 +147,7 @@ def step(
     """Generic step decorator.
 
     :param name: Step name as in the feature file.
-    :param type_: Step type ("given", "when" or "then"). If None, this step will work for all the types.
+    :param step_type: Step type (StepType). If None, this step will work for all the types.
     :param converters: Optional step arguments converters mapping.
     :param target_fixture: Optional fixture name to replace by step definition.
     :param stacklevel: Stack level to find the caller frame. This is used when injecting the step definition fixture.
@@ -161,7 +167,7 @@ def step(
         parser = get_parser(name)
 
         context = StepFunctionContext(
-            type=type_,
+            step_type=step_type,
             step_func=func,
             parser=parser,
             converters=converters,
@@ -175,7 +181,7 @@ def step(
 
         caller_locals = get_caller_module_locals(stacklevel=stacklevel)
         fixture_step_name = find_unique_name(
-            f"{StepNamePrefix.step_def.value}_{type_ or '*'}_{parser.name}", seen=caller_locals.keys()
+            f"{StepNamePrefix.step_def.value}_{type or '*'}_{parser.name}", seen=caller_locals.keys()
         )
         caller_locals[fixture_step_name] = pytest.fixture(name=fixture_step_name)(step_function_marker)
         return func

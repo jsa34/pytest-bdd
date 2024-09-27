@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 import typing
+from enum import Enum
 
 if typing.TYPE_CHECKING:
-    from typing_extensions import Literal
-
-from enum import Enum
+    from typing_extensions import Self
 
 
 class KeywordType(Enum):
@@ -21,8 +20,8 @@ class KeywordType(Enum):
         return [item.value for item in cls]
 
     @classmethod
-    def all_except_conjunction(cls):
-        return [item.value for item in cls if item != cls.CONJUNCTION]
+    def all_except_conjunction(cls) -> list[Self]:
+        return [item for item in cls if item != cls.CONJUNCTION]
 
     @classmethod
     def from_string(cls, value: str):
@@ -34,8 +33,17 @@ class KeywordType(Enum):
             return None
 
 
-GIVEN: Literal["given"] = "given"
-WHEN: Literal["when"] = "when"
-THEN: Literal["then"] = "then"
+class StepType(Enum):
+    GIVEN = "given"
+    WHEN = "when"
+    THEN = "then"
 
-STEP_TYPES = (GIVEN, WHEN, THEN)
+    @classmethod
+    def from_keyword_type(cls, keyword_type: KeywordType) -> StepType | None:
+        mapping = {
+            KeywordType.CONTEXT: cls.GIVEN,
+            KeywordType.CONJUNCTION: None,
+            KeywordType.ACTION: cls.WHEN,
+            KeywordType.OUTCOME: cls.THEN,
+        }
+        return mapping.get(keyword_type, None)

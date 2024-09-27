@@ -105,16 +105,16 @@ class Row:
 class DataTable:
     location: Location
     name: str | None = None
-    tableHeader: Row | None = None
-    tableBody: list[Row] | None = field(default_factory=list)
+    table_header: Row | None = None
+    table_body: list[Row] | None = field(default_factory=list)
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Self:
         return cls(
             location=Location.from_dict(data["location"]),
             name=data.get("name"),
-            tableHeader=Row.from_dict(data["tableHeader"]) if data.get("tableHeader") else None,
-            tableBody=[Row.from_dict(row) for row in data.get("tableBody", [])],
+            table_header=Row.from_dict(data["tableHeader"]) if data.get("tableHeader") else None,
+            table_body=[Row.from_dict(row) for row in data.get("tableBody", [])],
         )
 
 
@@ -137,22 +137,22 @@ class DocString:
 class Step:
     id: str
     keyword: str
-    keywordType: KeywordType
+    keyword_type: KeywordType
     location: Location
     text: str
-    dataTable: DataTable | None = None
-    docString: DocString | None = None
+    data_table: DataTable | None = None
+    doc_string: DocString | None = None
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Self:
         return cls(
             id=data["id"],
             keyword=data["keyword"].strip(),
-            keywordType=KeywordType.from_string(data["keywordType"]),
+            keyword_type=KeywordType.from_string(data["keywordType"]),
             location=Location.from_dict(data["location"]),
             text=data["text"],
-            dataTable=DataTable.from_dict(data["dataTable"]) if data.get("dataTable") else None,
-            docString=DocString.from_dict(data["docString"]) if data.get("docString") else None,
+            data_table=DataTable.from_dict(data["dataTable"]) if data.get("dataTable") else None,
+            doc_string=DocString.from_dict(data["docString"]) if data.get("docString") else None,
         )
 
 
@@ -254,7 +254,6 @@ class Child:
 @dataclass
 class Feature:
     keyword: str
-    language: str
     location: Location
     tags: list[Tag]
     name: str
@@ -265,7 +264,6 @@ class Feature:
     def from_dict(cls, data: dict[str, Any]) -> Self:
         return cls(
             keyword=data["keyword"],
-            language=data["language"],
             location=Location.from_dict(data["location"]),
             tags=[Tag.from_dict(tag) for tag in data["tags"]],
             name=data["name"],
