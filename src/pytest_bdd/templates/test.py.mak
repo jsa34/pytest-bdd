@@ -1,5 +1,4 @@
-% if features:
-"""${ features[0].name or features[0].rel_filename } feature tests."""
+"""${ feature.name or feature.rel_filename } feature tests."""
 
 from pytest_bdd import (
     given,
@@ -8,22 +7,28 @@ from pytest_bdd import (
     when,
 )
 
-
-% endif
-% for scenario in sorted(scenarios, key=lambda scenario: scenario.name):
-@scenario('${scenario.feature.rel_filename}', ${ make_string_literal(scenario.name)})
+# Define all scenarios in the feature
+% for scenario in sorted(feature.scenarios, key=lambda scenario: scenario.name):
+@scenario('${feature.rel_filename}', ${ make_string_literal(scenario.name)})
 def test_${ make_python_name(scenario.name)}():
     ${make_python_docstring(scenario.name)}
 
-
 % endfor
-% for step in steps:
-@${step.given_when_then}(${ make_string_literal(step.name)})
+
+# Background steps (if they exist)
+% if feature.background and feature.background.steps:
+% for step in feature.background.steps:
+@${step.step_type.value}(${ make_string_literal(step.name)})
 def _():
     ${make_python_docstring(step.name)}
     raise NotImplementedError
-% if not loop.last:
-
-
+% endfor
 % endif
+
+# Scenario steps
+% for step in steps:
+@${step.step_type.value}(${ make_string_literal(step.name)})
+def _():
+    ${make_python_docstring(step.name)}
+    raise NotImplementedError
 % endfor

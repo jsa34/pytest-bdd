@@ -9,9 +9,10 @@ def test_no_scenarios(pytester):
     features.joinpath("test.feature").write_text(
         textwrap.dedent(
             """
-        Given foo
-        When bar
-        Then baz
+        Feature: No Scenarios
+            Given foo
+            When bar
+            Then baz
     """
         ),
         encoding="utf-8",
@@ -27,4 +28,4 @@ def test_no_scenarios(pytester):
         )
     )
     result = pytester.runpytest()
-    result.stdout.fnmatch_lines(["*FeatureError*"])
+    result.stdout.fnmatch_lines(["*NoScenariosFound*"])

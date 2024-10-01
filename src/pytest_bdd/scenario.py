@@ -17,7 +17,7 @@ import contextlib
 import logging
 import os
 import re
-from typing import TYPE_CHECKING, Any, Callable, Iterable, Iterator, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Callable, Iterable, Iterator, List, TypeVar, cast
 
 import pytest
 from _pytest.fixtures import FixtureDef, FixtureManager, FixtureRequest, call_fixture_func
@@ -55,15 +55,15 @@ def find_fixturedefs_for_step(step: Step, fixturemanager: FixtureManager, node: 
             if step_func_context is None:
                 continue
 
-            if step_func_context.type is not None and step_func_context.type != step.given_when_then:
+            if step_func_context.step_type is not None and step_func_context.step_type != step.step_type:
                 continue
 
             match = step_func_context.parser.is_matching(step.name)
             if not match:
                 continue
 
-            fixturedefs = getfixturedefs(fixturemanager, fixturename, node)
-            if fixturedef not in (fixturedefs or []):
+            fixturedefs = cast(List[FixtureDef[Any]], getfixturedefs(fixturemanager, fixturename, node) or [])
+            if fixturedef not in fixturedefs:
                 continue
 
             yield fixturedef
@@ -151,7 +151,7 @@ def inject_fixturedefs_for_step(step: Step, fixturemanager: FixtureManager, node
         del fixturemanager._arg2fixturedefs[bdd_name]
 
 
-def get_step_function(request, step: Step) -> StepFunctionContext | None:
+def get_step_function(request: FixtureRequest, step: Step) -> StepFunctionContext | None:
     """Get the step function (context) for the given step.
 
     We first figure out what's the step fixture name that we have to inject.
@@ -171,13 +171,13 @@ def get_step_function(request, step: Step) -> StepFunctionContext | None:
 
 
 def _execute_step_function(
-    request: FixtureRequest, gherkin_scenario: Scenario, step: Step, context: StepFunctionContext
+    request: FixtureRequest, feature: Feature, gherkin_scenario: Scenario, step: Step, context: StepFunctionContext
 ) -> None:
     """Execute step function."""
     __tracebackhide__ = True
     kw = {
         "request": request,
-        "feature": gherkin_scenario.feature,
+        "feature": feature,
         "scenario": gherkin_scenario,
         "step": step,
         "step_func": context.step_func,
@@ -227,12 +227,16 @@ def _execute_scenario(feature: Feature, gherkin_scenario: Scenario, request: Fix
     request.config.hook.pytest_bdd_before_scenario(request=request, feature=feature, scenario=gherkin_scenario)
 
     try:
-        for step in gherkin_scenario.all_steps:
+        steps = []
+        if feature.background:
+            steps.extend(feature.background.steps)
+        steps.extend(gherkin_scenario.steps)
+        for step in steps:
             step_func_context = get_step_function(request=request, step=step)
             if step_func_context is None:
                 exc = exceptions.StepDefinitionNotFoundError(
                     f"Step definition is not found: {step}. "
-                    f'Line {step.location.line} in scenario "{gherkin_scenario.name}" in the feature "{gherkin_scenario.parent.abs_filename}"'
+                    f'Line {step.location.line} in scenario "{gherkin_scenario.name}" in the feature "{feature.abs_filename}"'
                 )
                 request.config.hook.pytest_bdd_step_func_lookup_error(
                     request=request,
@@ -242,7 +246,7 @@ def _execute_scenario(feature: Feature, gherkin_scenario: Scenario, request: Fix
                     exception=exc,
                 )
                 raise exc
-            _execute_step_function(request, gherkin_scenario, step, step_func_context)
+            _execute_step_function(request, feature, gherkin_scenario, step, step_func_context)
     finally:
         request.config.hook.pytest_bdd_after_scenario(request=request, feature=feature, scenario=gherkin_scenario)
 
@@ -336,14 +340,14 @@ def scenario(
 
 
 def get_features_base_dir(caller_module_path: str) -> str:
-    d = get_from_ini("bdd_features_base_dir", None)
+    d = get_from_ini("bdd_features_base_dir")
     if d is None:
         return os.path.dirname(caller_module_path)
     rootdir = CONFIG_STACK[-1].rootpath
     return os.path.join(rootdir, d)
 
 
-def get_from_ini(key: str, default: str) -> str:
+def get_from_ini(key: str, default: str | None = None) -> str | None:
     """Get value from ini config. Return default if value has not been set.
 
     Use if the default value is dynamic. Otherwise, set default on addini call.

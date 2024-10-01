@@ -38,7 +38,7 @@ def migrate_tests_in_file(file_path: str) -> None:
         pass
 
 
-def check_existense(file_name: str) -> str:
+def check_existence(file_name: str) -> str:
     """Check file or directory name for existence."""
     if not os.path.exists(file_name):
         raise argparse.ArgumentTypeError(f"{file_name} is an invalid file or directory name")
@@ -47,7 +47,7 @@ def check_existense(file_name: str) -> str:
 
 def print_generated_code(args: argparse.Namespace) -> None:
     """Print generated test code for the given filenames."""
-    features, scenarios, steps = parse_feature_files(args.files)
+    features = parse_feature_files(args.files)
     code = generate_code(features, scenarios, steps)
     print(code)
 
@@ -61,7 +61,7 @@ def main() -> None:
     parser_generate.add_argument(
         "files",
         metavar="FEATURE_FILE",
-        type=check_existense,
+        type=check_existence,
         nargs="+",
         help="Feature files to generate test code with",
     )

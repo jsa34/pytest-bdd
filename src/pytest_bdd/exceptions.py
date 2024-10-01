@@ -15,10 +15,6 @@ class ScenarioNotFound(ScenarioValidationError):
     """Scenario Not Found."""
 
 
-class ExamplesNotValidError(ScenarioValidationError):
-    """Example table is not valid."""
-
-
 class StepDefinitionNotFoundError(Exception):
     """Step definition not found."""
 
@@ -27,11 +23,42 @@ class NoScenariosFound(Exception):
     """No scenarios found."""
 
 
-class FeatureError(Exception):
-    """Feature parse error."""
+class GherkinParseError(Exception):
+    """Base class for all Gherkin parsing errors."""
 
-    message = "{0}.\nLine number: {1}.\nLine: {2}.\nFile: {3}"
+    def __init__(self, message: str, line: int, line_content: str, filename: str | None = None) -> None:
+        super().__init__(message)
+        self.message = message
+        self.line = line
+        self.line_content = line_content
+        self.filename = filename
 
     def __str__(self) -> str:
-        """String representation."""
-        return self.message.format(*self.args)
+        error_str = f"{self.message}\nLine number: {self.line}\nLine: {self.line_content}"
+        if self.filename:
+            error_str = error_str + f"\nFile: {self.filename}"
+        return error_str
+
+
+class FeatureError(GherkinParseError):
+    pass
+
+
+class BackgroundError(GherkinParseError):
+    pass
+
+
+class ScenarioError(GherkinParseError):
+    pass
+
+
+class StepError(GherkinParseError):
+    pass
+
+
+class RuleError(GherkinParseError):
+    pass
+
+
+class TokenError(GherkinParseError):
+    pass
