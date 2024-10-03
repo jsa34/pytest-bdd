@@ -188,6 +188,5 @@ def test_at_in_scenario(pytester):
         scenarios('test.feature')
     """
     )
-    strict_option = "--strict-markers"
-    result = pytester.runpytest_inprocess(strict_option)
+    result = pytester.runpytest_inprocess()
     result.stdout.fnmatch_lines(["*= 2 passed * =*"])

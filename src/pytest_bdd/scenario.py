@@ -227,10 +227,7 @@ def _execute_scenario(feature: Feature, gherkin_scenario: Scenario, request: Fix
     request.config.hook.pytest_bdd_before_scenario(request=request, feature=feature, scenario=gherkin_scenario)
 
     try:
-        steps = []
-        if feature.background:
-            steps.extend(feature.background.steps)
-        steps.extend(gherkin_scenario.steps)
+        steps = gherkin_scenario.all_steps
         for step in steps:
             step_func_context = get_step_function(request=request, step=step)
             if step_func_context is None:

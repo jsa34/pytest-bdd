@@ -5,7 +5,7 @@ import re
 import textwrap
 from dataclasses import dataclass, field
 from functools import cached_property
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Set, Union
+from typing import Any, Iterable, List, Mapping
 
 from gherkin.errors import CompositeParserException
 from gherkin.parser import Parser
@@ -230,7 +230,7 @@ class Scenario:
     steps: list[Step]
     tags: set[Tag]
     examples: list[DataTable] = field(default_factory=list)
-    parent: Feature | Rule = None
+    parent: Child | None = None
 
     def __post_init__(self):
         self.steps = _compute_step_type(self.steps)
@@ -251,11 +251,7 @@ class Scenario:
 
     @cached_property
     def feature(self) -> Feature:
-        return self.parent if _check_instance_by_name(self.parent, "Feature") else None
-
-    @cached_property
-    def rule(self) -> Rule:
-        return self.parent if _check_instance_by_name(self.parent, "Rule") else None
+        return self.parent.parent
 
     @property
     def all_steps(self) -> list[Step]:
@@ -286,11 +282,11 @@ class Rule:
     description: str
     tags: set[Tag]
     children: list[Child]
-    parent: Feature | None = None
+    parent: Child | None = None
 
     def __post_init__(self):
-        for scenario in self.children:
-            scenario.parent = self
+        for child in self.children:
+            child.parent = self
 
     @cached_property
     def tag_names(self) -> set[str]:
@@ -317,7 +313,7 @@ class Background:
     name: str
     description: str
     steps: list[Step]
-    parent: Feature | None = None
+    parent: Child | None = None
 
     def __post_init__(self):
         self.steps = _compute_step_type(self.steps)
@@ -352,10 +348,12 @@ class Child:
     parent: Feature | Rule | None = None
 
     def __post_init__(self):
-        if self.scenario:
-            self.scenario.parent = self.parent
         if self.background:
-            self.background.parent = self.parent
+            self.background.parent = self
+        if self.rule:
+            self.rule.parent = self
+        if self.scenario:
+            self.scenario.parent = self
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Self:
@@ -376,26 +374,20 @@ class Feature:
     tags: set[Tag]
     language: str
     background: Background | None = None
+    scenarios: list[Scenario] = field(default_factory=list)
+    rules: list[Rule] = field(default_factory=list)
     abs_filename: str | None = None
     rel_filename: str | None = None
 
     def __post_init__(self):
         for child in self.children:
             child.parent = self
-            if child.scenario:
-                child.scenario.parent = self
-            if child.background:
-                child.background.parent = self
-
-    @property
-    def scenarios(self) -> list[Scenario]:
-        """Retrieve all scenarios, whether they are directly part of the feature or within rules."""
-        return [child.scenario for child in self.children if child.scenario is not None]
-
-    @cached_property
-    def rules(self) -> list[Rule]:
-        """Retrieve all rules within the feature."""
-        return [child.rule for child in self.children if child.rule is not None]
+            if _scenario := child.scenario:
+                self.scenarios.append(_scenario)
+            elif _background := child.background:
+                self.background = _background
+            elif _rule := child.rule:
+                self.rules.append(_rule)
 
     @property
     def background_steps(self) -> list[Step]:
@@ -438,7 +430,6 @@ class Feature:
             children=[Child.from_dict(child) for child in data["children"]],
             tags={Tag.from_dict(tag) for tag in data["tags"]},
             language=data["language"],
-            background=Background.from_dict(data["background"]) if data.get("background") else None,
         )
 
 
@@ -464,12 +455,12 @@ def _compute_step_type(steps: list[Step]) -> list[Step]:
     first_step = steps[0]
     first_keyword_type = first_step.keyword_type
 
-    # Validate that the first step does not start with a conjunction (e.g., "And")
-    if first_keyword_type == KeywordType.CONJUNCTION:
+    # Validate that the first step starts with a valid keyword (e.g. "Given", "When", or "Then")
+    if first_keyword_type not in (KeywordType.CONTEXT, KeywordType.ACTION, KeywordType.OUTCOME):
         raise StepError(
             message=(
-                f"Invalid first step: Expected 'Given', 'When', or 'Then' but got '{first_step.keyword}' "
-                f"at line {first_step.location.line}."
+                "First step in a scenario or background must start with 'Given', 'When' or 'Then', "
+                f"but got {first_step.keyword}."
             ),
             line=first_step.location.line,
             line_content=first_step.name,

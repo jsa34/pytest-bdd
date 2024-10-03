@@ -42,7 +42,7 @@ class StepReport:
         """
         return {
             "name": self.step.name,
-            "type": self.step.step_type,
+            "type": self.step.step_type.value,
             "keyword": self.step.keyword,
             "line_number": self.step.location.line,
             "failed": self.failed,

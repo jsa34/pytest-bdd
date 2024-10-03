@@ -48,7 +48,12 @@ def check_existence(file_name: str) -> str:
 def print_generated_code(args: argparse.Namespace) -> None:
     """Print generated test code for the given filenames."""
     features = parse_feature_files(args.files)
-    code = generate_code(features, scenarios, steps)
+    code = ""
+    for feature in features:
+        steps = []
+        for scenario in feature.scenarios:
+            steps.extend(scenario.all_steps)
+        code += generate_code(feature, feature.scenarios, steps)
     print(code)
 
 

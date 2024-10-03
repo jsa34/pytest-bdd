@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import itertools
 import os.path
-from typing import TYPE_CHECKING, List, Union, cast
+from typing import TYPE_CHECKING, cast
 
 from _pytest._io import TerminalWriter
 from attr import dataclass
@@ -28,12 +28,6 @@ if TYPE_CHECKING:
 
 
 template_lookup = TemplateLookup(directories=[os.path.join(os.path.dirname(__file__), "templates")])
-
-
-@dataclass
-class StepsMissingDefinition:
-    step: Step
-    step_parent: Scenario | Background
 
 
 def add_options(parser: Parser) -> None:
@@ -64,9 +58,7 @@ def cmdline_main(config: Config) -> int | None:
     return None  # Make mypy happy
 
 
-def generate_code(
-    feature: Feature, scenarios: list[Scenario], steps_missing_definition: list[StepsMissingDefinition]
-) -> str:
+def generate_code(feature: Feature, scenarios: list[Scenario], steps_missing_definition: list[Step]) -> str:
     """Generate test code for the given filenames."""
     grouped_steps = group_steps(steps_missing_definition)
     template = template_lookup.get_template("test.py.mak")
@@ -105,7 +97,7 @@ def parse_feature_files(paths: list[str], **kwargs: Any) -> list[Feature]:
     return get_features(paths, **kwargs)
 
 
-def group_steps(steps: list[StepsMissingDefinition]) -> list[Step]:
+def group_steps(steps: list[Step]) -> list[Step]:
     """Group steps by type (GIVEN, WHEN, THEN) and remove duplicates."""
     order_mapping = {
         StepType.GIVEN: 0,
@@ -114,20 +106,19 @@ def group_steps(steps: list[StepsMissingDefinition]) -> list[Step]:
     }
 
     # Sort steps by step_type (order: GIVEN -> WHEN -> THEN)
-    steps = sorted(steps, key=lambda s: order_mapping.get(s.step.step_type, float("inf")))
+    steps = sorted(steps, key=lambda s: order_mapping.get(s.step_type, float("inf")))
 
     seen_steps = set()
     grouped_steps: list[Step] = []
 
     # Group steps by step_type and sort within the group by step name
     for step_missing_definition in itertools.chain.from_iterable(
-        sorted(group, key=lambda s: s.step.name) for _, group in itertools.groupby(steps, lambda s: s.step.step_type)
+        sorted(group, key=lambda s: s.name) for _, group in itertools.groupby(steps, lambda s: s.step_type)
     ):
         # Only add step if its name hasn't been seen before
-        if step_missing_definition.step.name not in seen_steps:
-            step = step_missing_definition.step
-            grouped_steps.append(step)
-            seen_steps.add(step.name)
+        if step_missing_definition.name not in seen_steps:
+            grouped_steps.append(step_missing_definition)
+            seen_steps.add(step_missing_definition.name)
 
     return grouped_steps
 
@@ -184,32 +175,24 @@ class StepsMissingDefinition:
     step_parent: Scenario | Background
 
 
-def find_steps_missing_definition(
-    feature: Feature, fixture_manager: FixtureManager, session: Session
-) -> list[StepsMissingDefinition]:
+def find_steps_missing_definition(feature: Feature, fixture_manager: FixtureManager, session: Session) -> list[Step]:
+    steps_missing_definition = []
 
-    def check_steps(steps, owner):
+    def check_steps(steps):
         for item in session.items:
             for step in steps:
                 if not _find_step_fixturedef(fixture_manager, item, step=step):
-                    if not any(existing.step.raw_name == step.raw_name for existing in steps_missing_definition):
-                        steps_missing_definition.append(StepsMissingDefinition(step, owner))
+                    if not any(known.raw_name == step.raw_name for known in steps_missing_definition):
+                        steps_missing_definition.append(step)
 
-    steps_missing_definition = []
-
-    # Check steps in scenarios
     for scenario in feature.scenarios:
-        check_steps(scenario.steps, scenario)
-
-    # Check background steps
-    if feature.background:
-        check_steps(feature.background.steps, feature.background)
+        check_steps(scenario.all_steps)
 
     return steps_missing_definition
 
 
 def print_missing_code(
-    feature: Feature, unbound_scenarios: list[Scenario], steps_missing_definition: list[StepsMissingDefinition]
+    feature: Feature, unbound_scenarios: list[Scenario], steps_missing_definition: list[Step]
 ) -> None:
     """Print missing code with TerminalWriter."""
     tw = TerminalWriter()
@@ -225,10 +208,9 @@ def print_missing_code(
     if unbound_scenarios:
         tw.sep("-", red=True)
 
-    for step_missing_definition in steps_missing_definition:
+    for step in steps_missing_definition:
         tw.line()
-        step = step_missing_definition.step
-        if isinstance(step_missing_definition.step_parent, Background):
+        if step.background:
             tw.line(
                 f"Step {step} is not defined in the background of the feature"
                 f' "{feature.name}" in the file'
@@ -236,9 +218,8 @@ def print_missing_code(
                 red=True,
             )
         else:
-            step_scenario: Scenario = step_missing_definition.step_parent
             tw.line(
-                f'Step {step} is not defined in the scenario "{step_scenario.name}" in the feature'
+                f'Step {step} is not defined in the scenario "{step.scenario.name}" in the feature'
                 f' "{feature.name}" in the file'
                 f" {feature.abs_filename}:{step.location.line}",
                 red=True,

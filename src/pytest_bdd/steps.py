@@ -71,7 +71,7 @@ class StepFunctionContext:
 
 def get_step_fixture_name(step: Step) -> str:
     """Get step fixture name"""
-    return f"{StepNamePrefix.step_impl.value}_{step.step_type}_{step.name}"
+    return f"{StepNamePrefix.step_impl.value}_{step.step_type.value}_{step.name}"
 
 
 def given(
@@ -181,7 +181,8 @@ def step(
 
         caller_locals = get_caller_module_locals(stacklevel=stacklevel)
         fixture_step_name = find_unique_name(
-            f"{StepNamePrefix.step_def.value}_{step_type.value or '*'}_{parser.name}", seen=caller_locals.keys()
+            f"{StepNamePrefix.step_def.value}_{step_type.value if step_type else '*'}_{parser.name}",
+            seen=caller_locals.keys(),
         )
         caller_locals[fixture_step_name] = pytest.fixture(name=fixture_step_name)(step_function_marker)
         return func

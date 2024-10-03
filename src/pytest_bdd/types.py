@@ -47,3 +47,14 @@ class StepType(Enum):
             KeywordType.OUTCOME: cls.THEN,
         }
         return mapping.get(keyword_type, None)
+
+    def __eq__(self, other):
+        if isinstance(other, StepType):
+            return self.value == other.value
+        if isinstance(other, str):  # Optionally allow comparison to string values
+            return self.value == other
+        return False
+
+    # Override the hash method
+    def __hash__(self):
+        return hash(self.value)
