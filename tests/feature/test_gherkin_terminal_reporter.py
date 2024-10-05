@@ -236,3 +236,72 @@ def test_step_parameters_should_be_replaced_by_their_values(pytester):
     result.stdout.fnmatch_lines("*When I eat {eat} cucumbers".format(**example))
     result.stdout.fnmatch_lines("*Then I should have {left} cucumbers".format(**example))
     result.stdout.fnmatch_lines("*PASSED")
+
+
+import textwrap
+
+
+def test_non_english_feature_reported_correctly_in_terminal(pytester):
+    exemple = {"nombre_1": 2, "nombre_2": 3, "résultat": 5}
+
+    # Create the feature file with the specified lines
+    feature_content = textwrap.dedent(
+        """\
+        # language: fr
+
+        Fonctionnalité: Additionner deux nombres
+          Plan du scénario: Additionner deux nombres positifs
+            Étant donné que j'introduis le premier nombre à ajouter: <Nombre 1>
+            Et j'introduis le deuxième nombre à ajouter: <Nombre 2>
+            Quand j'additionne les nombres
+            Alors le résultat doit être <Résultat>
+
+            Exemples:
+              | Nombre 1   | Nombre 2   | Résultat   |
+              | {nombre_1} | {nombre_2} | {résultat} |
+        """.format(
+            **exemple
+        )
+    )
+
+    pytester.makefile(".feature", test=feature_content)
+    pytester.makepyfile(
+        test_gherkin=textwrap.dedent(
+            """\
+            from pytest_bdd import given, when, scenarios, then, parsers
+
+            scenarios('test.feature')
+
+            @given(parsers.parse("j'introduis le premier nombre à ajouter: {nombre_1:d}"), target_fixture="nombre_1")
+            def _(nombre_1):
+                return nombre_1
+
+            @given(parsers.parse("j'introduis le deuxième nombre à ajouter: {nombre_2:d}"), target_fixture="nombre_2")
+            def _(nombre_2):
+                return nombre_2
+
+            @when("j'additionne les nombres", target_fixture="total")
+            def _(nombre_1, nombre_2):
+                return nombre_1 + nombre_2
+
+            @then(parsers.parse("le résultat doit être {résultat:d}"))
+            def _(résultat, total):
+                assert total == résultat
+        """
+        )
+    )
+
+    result = pytester.runpytest("--gherkin-terminal-reporter", "-vv")
+
+    # Check that the test passed
+    result.assert_outcomes(passed=1, failed=0)
+
+    # Get the output from the pytest run
+    output_lines = result.stdout
+
+    # Assert that each line from the feature file is in the output
+    for line in feature_content.splitlines():
+        if "# language:" in line:
+            continue
+        if line:
+            assert output_lines.fnmatch_lines(line.strip())
