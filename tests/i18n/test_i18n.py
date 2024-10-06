@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from src.pytest_bdd.gherkin_parser import get_gherkin_document
+from src.pytest_bdd.parser import get_gherkin_document
 
 
 def test_portuguese_language():

@@ -4,6 +4,8 @@ import typing
 
 from _pytest.terminal import TerminalReporter
 
+from pytest_bdd import scenario
+
 if typing.TYPE_CHECKING:
     from typing import Any
 
@@ -70,10 +72,10 @@ class GherkinTerminalReporter(TerminalReporter):  # type: ignore
 
         # Common logic for verbosity 1 and greater
         self.ensure_newline()
-        self._tw.write("Feature: ", **feature_markup)
+        self._tw.write(f"{report.scenario.feature.keyword}: ", **feature_markup)
         self._tw.write(report.scenario["feature"]["name"], **feature_markup)
         self._tw.write("\n")
-        self._tw.write("    Scenario: ", **scenario_markup)
+        self._tw.write(f"    {report.scenario.keyword}: ", **scenario_markup)
         self._tw.write(report.scenario["name"], **scenario_markup)
 
         if self.verbosity == 1:

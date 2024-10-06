@@ -64,6 +64,7 @@ def get_features(paths: list[str], encoding: str = "utf-8") -> list[Feature]:
     """Get features for given paths.
 
     :param list paths: `list` of paths (file or dirs)
+    :param str encoding: encoding to use when reading feature files (default utf-8)
 
     :return: `list` of `Feature` objects.
     """
