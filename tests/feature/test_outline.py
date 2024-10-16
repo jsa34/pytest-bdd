@@ -79,6 +79,60 @@ def test_outlined(pytester):
     # fmt: on
 
 
+def test_outlined_with_multiple_example_tables(pytester):
+    pytester.makefile(
+        ".feature",
+        outline=textwrap.dedent(
+            """\
+            Feature: Outline
+                Scenario Outline: Outlined given, when, thens with multiple example tables
+                    Given there are <start> cucumbers
+                    When I eat <eat> cucumbers
+                    Then I should have <left> cucumbers
+
+                    @big
+                    Examples: Big numbers
+                    | start | eat | left |
+                    |  12   |  5  |  7   |
+                    |  5    |  4  |  1   |
+
+                    @small
+                    Examples: Small numbers
+                    | start | eat | left |
+                    |  3    |  2  |  1   |
+                    |  1    |  1  |  0   |
+
+            """
+        ),
+    )
+
+    pytester.makeconftest(textwrap.dedent(STEPS))
+
+    pytester.makepyfile(
+        textwrap.dedent(
+            """\
+        from pytest_bdd import scenario
+
+        @scenario(
+            "outline.feature",
+            "Outlined given, when, thens with multiple example tables",
+        )
+        def test_outline(request):
+            pass
+
+        """
+        )
+    )
+    result = pytester.runpytest("-s")
+    result.assert_outcomes(passed=4)
+    # fmt: off
+    assert collect_dumped_objects(result) == [
+        12, 5.0, "7",
+        5, 4.0, "1",
+    ]
+    # fmt: on
+
+
 def test_unused_params(pytester):
     """Test parametrized scenario when the test function lacks parameters."""
 
